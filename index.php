@@ -17,6 +17,27 @@ body {
 <script src="lib/codemirror.js"></script>
 <script src="mode/javascript/javascript.js"></script>
 <script>
+<?php
+session_set_cookie_params(3600);  // = lifetime: 1h
+session_start();
+if (!$_SESSION['loaded']) {
+  if (rand(0, 1) == 1) {
+    $pos = rand(20, 200);
+  } else {
+    $pos = rand(330, 560);
+  }
+  $angle = rand(-90, 90);
+  $_SESSION['loaded'] = true;
+  $_SESSION['pos'] = $pos;
+  $_SESSION['angle'] = $angle;
+} else {
+  $pos = $_SESSION['pos'];
+  $angle = $_SESSION['angle'];
+}
+echo "var player_start_pos = [100, " . $pos . "];\n";
+echo "var player_start_angle = " . $angle . ";\n";
+?>
+
 function draw_line(begin_x, begin_y, len, angle, dash) {
   var c = document.getElementById("myCanvas");
   var ctx = c.getContext("2d");
@@ -76,8 +97,8 @@ function draw_goal() {
   ctx.strokeStyle = '#000000';
 }
 
-var player_pos = [100, 100];
-var player_angle = 0;
+var player_pos = player_start_pos;
+var player_angle = player_start_angle;
 var player_has_ball = true;
 var ball_pos = player_pos;
 
@@ -89,8 +110,8 @@ function is_goal() {
 var editor = null;
 
 function run() {
-  player_pos = [100, 100];
-  player_angle = 0;
+  player_pos = player_start_pos;
+  player_angle = player_start_angle;
   player_has_ball = true;
   ball_pos = player_pos;
   var canvas = document.getElementById("myCanvas");
@@ -171,13 +192,6 @@ function shoot(power) {
 <p>Code:</p>
 <form>
 <p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
-go(100);
-rotate(90);
-go(200);
-rotate(-60);
-go(200);
-rotate(-70);
-shoot(3);
 </textarea></p>
 <table width="80%" border="0"><tr><td>
 <p align="center" style="font-size: 20px; color: black;" id="isGoal"/></td><td>
