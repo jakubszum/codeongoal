@@ -17,105 +17,160 @@ body {
 <script src="lib/codemirror.js"></script>
 <script src="mode/javascript/javascript.js"></script>
 <script>
-<?php
-session_set_cookie_params(3600);  // = lifetime: 1h
-session_start();
-if (!$_SESSION['loaded']) {
-  if (rand(0, 1) == 1) {
-    $pos = rand(20, 200);
-  } else {
-    $pos = rand(330, 560);
-  }
-  $angle = rand(-90, 90);
-  $_SESSION['loaded'] = true;
-  $_SESSION['pos'] = $pos;
-  $_SESSION['angle'] = $angle;
-} else {
-  $pos = $_SESSION['pos'];
-  $angle = $_SESSION['angle'];
-}
-echo "var player_start_pos = [100, " . $pos . "];\n";
-echo "var player_start_angle = " . $angle . ";\n";
-?>
 
-function draw_line(begin_x, begin_y, len, angle, dash) {
+class Point {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+};
+
+function calc_end_pos(begin_pos, len, angle) {
+  var end_x = begin_pos.x + len * Math.cos(angle);
+  var end_y = begin_pos.y + len * Math.sin(angle);
+  return new Point(end_x, end_y);
+}
+
+function draw_line(begin_pos, end_pos, dash) {
   var c = document.getElementById("myCanvas");
   var ctx = c.getContext("2d");
   ctx.beginPath();
   ctx.setLineDash(dash);
-  ctx.moveTo(begin_x, begin_y);
-  var end_x = begin_x + len * Math.cos(angle);
-  var end_y = begin_y + len * Math.sin(angle);
-  ctx.lineTo(end_x, end_y);
+  ctx.moveTo(begin_pos.x, begin_pos.y);
+  ctx.lineTo(end_pos.x, end_pos.y);
   ctx.stroke();
   ctx.setLineDash([]);
-  return [end_x, end_y];
 }
 
-function draw_player(begin_x, begin_y, angle) {
-  var c = document.getElementById("myCanvas");
-  var ctx = c.getContext("2d");
-  ctx.beginPath();
-  var r = 10;
-  ctx.arc(begin_x, begin_y, r, 0, 2 * Math.PI);
-  ctx.fillStyle = "#ff0000";
-  ctx.fill();
-  ctx.moveTo(begin_x, begin_y);
-  var end_x = begin_x + r * Math.cos(angle);
-  var end_y = begin_y + r * Math.sin(angle);
-  ctx.lineTo(end_x, end_y);
-  ctx.stroke();
-}
-
-function draw_ball(begin_x, begin_y) {
-  var c = document.getElementById("myCanvas");
-  var ctx = c.getContext("2d");
-  ctx.beginPath();
-  var r = 5;
-  ctx.arc(begin_x, begin_y, r, 0, 2 * Math.PI);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.stroke();
-}
-
-var goal_dim = [750, 245, 40, 80];
-
-function draw_goal() {
-  var c = document.getElementById("myCanvas");
-  var ctx = c.getContext("2d");
-  ctx.beginPath();
-  ctx.strokeStyle = '#ffff00';
-  for (x = goal_dim[0]; x <= (goal_dim[0] + goal_dim[2]); x += 10) {
-    ctx.moveTo(x, goal_dim[1]);
-    ctx.lineTo(x, goal_dim[1] + goal_dim[3]);
+class Ball {
+  constructor(ctx, pos) {
+    this.ctx = ctx;
+    this.pos = pos;
   }
-  for (y = goal_dim[1]; y <= (goal_dim[1] + goal_dim[3]); y += 10) {
-    ctx.moveTo(goal_dim[0], y);
-    ctx.lineTo(goal_dim[0] + goal_dim[2], y);
+
+  draw(pos) {
+    this.ctx.beginPath();
+    var r = 5;
+    this.ctx.arc(this.pos.x, this.pos.y, r, 0, 2 * Math.PI);
+    this.ctx.fillStyle = "#ffffff";
+    this.ctx.fill();
+    this.ctx.stroke();
   }
-  ctx.stroke();
-  ctx.strokeStyle = '#000000';
-}
+};
 
-var player_pos = player_start_pos;
-var player_angle = player_start_angle;
-var player_has_ball = true;
-var ball_pos = player_pos;
+class Goal {
+  constructor(ctx, pos, w, h) {
+    this.ctx = ctx;
+    this.pos = pos;
+    this.w = w;
+    this.h = h;
+  }
 
-function is_goal() {
-  return ball_pos[0] > goal_dim[0] && ball_pos[0] < (goal_dim[0] + goal_dim[2]) &&
-         ball_pos[1] > goal_dim[1] && ball_pos[1] < (goal_dim[1] + goal_dim[3])
-}
+  draw() {
+    this.ctx.beginPath();
+    this.ctx.strokeStyle = '#ffff00';
+    for (let x = this.pos.x; x <= (this.pos.x + this.w); x += 10) {
+      this.ctx.moveTo(x, this.pos.y);
+      this.ctx.lineTo(x, this.pos.y + this.h);
+    }
+    for (let y = this.pos.y; y <= (this.pos.y + this.h); y += 10) {
+      this.ctx.moveTo(this.pos.x, y);
+      this.ctx.lineTo(this.pos.x + this.w, y);
+    }
+    this.ctx.stroke();
+    this.ctx.strokeStyle = '#000000';
+  }
+
+  is_ball_in(ball_pos) {
+    return ball_pos.x > this.pos.x && ball_pos.x < (this.pos.x + this.w) &&
+           ball_pos.y > this.pos.y && ball_pos.y < (this.pos.y + this.h)
+  }
+};
+
+class Player {
+  constructor(ctx, pos, angle, color, ball, has_ball) {
+    this.ctx = ctx;
+    this.pos = pos;
+    this.angle = angle;
+    this.color = color;
+    this.ball = ball;
+    this.has_ball = has_ball;
+    if (this.has_ball) {
+      this.ball.pos = this.pos;
+    }
+  }
+
+  draw() {
+    this.ctx.save();
+    var r = 10;
+    this.ctx.translate(this.pos.x, this.pos.y);
+    this.ctx.rotate(this.angle);
+    //feets
+    this.ctx.beginPath();
+    this.ctx.arc(0 + 3*r/4, 0 - 2*r/3, r/2, 0, 2 * Math.PI);
+    this.ctx.arc(0 + 3*r/4, 0 + 2*r/3, r/2, 0, 2 * Math.PI);
+    this.ctx.fillStyle = "#000000";
+    this.ctx.fill();
+    if (this.has_ball) {
+      // ball
+      this.ctx.beginPath();
+      this.ctx.arc(0 + 3*r/2, 0 - r, r/2, 0, 2 * Math.PI);
+      this.ctx.fillStyle = "#ffffff";
+      this.ctx.fill();
+      this.ctx.stroke();
+    }
+    // body
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 0, r, r + r/2, 0, 0, 2 * Math.PI)
+    this.ctx.fillStyle = this.color;
+    this.ctx.fill();
+    this.ctx.stroke();
+    // head
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, r/2, 0, 2 * Math.PI);
+    this.ctx.fillStyle = "#000000";
+    this.ctx.fill();
+    this.ctx.restore();
+  }
+
+  go(len) {
+    let end_pos = calc_end_pos(this.pos, len, this.angle);
+    draw_line(this.pos, end_pos, [5, 10]);
+    this.pos = end_pos;
+    this.draw();
+  }
+
+  rotate(angle_degrees) {
+    this.angle += (angle_degrees * (Math.PI / 180));
+    this.draw();
+  }
+
+  shoot(power) {
+    if (this.has_ball) {
+      let end_pos = calc_end_pos(this.pos, power * 100, this.angle);
+      draw_line(this.pos, end_pos, [3, 3]);
+      ball.pos = end_pos;
+      ball.draw();
+      this.has_ball = false;
+    }
+  }
+};
+
+var player_start_pos = new Point(100, 50);
+var player_start_angle = 0;
+
+var player = null;
+var ball = null;
+var goal = null;
 
 var editor = null;
 
 function run() {
-  player_pos = player_start_pos;
-  player_angle = player_start_angle;
-  player_has_ball = true;
-  ball_pos = player_pos;
   var canvas = document.getElementById("myCanvas");
   var ctx = canvas.getContext("2d");
+  ball = new Ball(ctx, new Point(0, 0));
+  player = new Player(ctx, player_start_pos, player_start_angle, "red", ball, true);
+  goal = new Goal(ctx, new Point(750, 245), 40, 80);
   var imageObj = new Image();
   imageObj.src = "boisko.jpg";
   imageObj.onload = function(){
@@ -125,18 +180,26 @@ function run() {
     ctx.lineStyle = "#ffff00";
     ctx.font = "10pt sans-serif";
     ctx.fillText("goal.ziv.pl", 6, 16);
-    draw_goal();
-    draw_player(player_pos[0], player_pos[1], player_angle);
+    goal.draw();
+    let player2 = new Player(ctx, player_start_pos, player_start_angle, "silver", ball, false);
+    player2.draw();
     var textArea = document.getElementById("myText");
     if (!editor) {
       editor = CodeMirror.fromTextArea(textArea, { lineNumbers: true, mode: "javascript" });
       editor.setSize("100%", "400px");
     }
     eval(editor.getDoc().getValue());
+    player.draw();
+    is_goal = goal.is_ball_in(ball.pos);
+    if (is_goal) {
+      ctx.fillStyle = "yellow";
+      ctx.font = "48pt sans-serif";
+      ctx.fillText("GOAL!!!", 300, 300);
+    }
     var isGoal = document.getElementById("isGoal");
-    isGoal.textContent = (is_goal() ? "Goal!" : "No goal");
+    isGoal.textContent = (is_goal ? "Goal!" : "No goal");
     var button_done = document.getElementById("buttonDone");
-    button_done.disabled = !is_goal();
+    button_done.disabled = !is_goal;
   };
 };
 
@@ -147,11 +210,7 @@ function go(len) {
   if (len < 0) {
     len = 0;
   }
-  if (!player_has_ball) {
-    return;
-  }
-  player_pos = draw_line(player_pos[0], player_pos[1], len, player_angle, []);
-  draw_player(player_pos[0], player_pos[1], player_angle);
+  player.go(len);
 }
 
 function rotate(angle_degrees) {
@@ -161,11 +220,7 @@ function rotate(angle_degrees) {
   if (angle_degrees < -360) {
     angle_degrees = -360;
   }
-  if (!player_has_ball) {
-    return;
-  }
-  player_angle += (angle_degrees * (Math.PI / 180));
-  draw_player(player_pos[0], player_pos[1], player_angle);
+  player.rotate(angle_degrees);
 }
 
 function shoot(power) {
@@ -175,11 +230,7 @@ function shoot(power) {
   if (power < 0) {
     power = 0;
   }
-  if (player_has_ball) {
-    ball_pos = draw_line(player_pos[0], player_pos[1], power * 100, player_angle, [5, 10]);
-    draw_ball(ball_pos[0], ball_pos[1]);
-    player_has_ball = false;
-  }
+  player.shoot(power);
 }
 </script>
 </head>
@@ -192,6 +243,12 @@ function shoot(power) {
 <p>Code:</p>
 <form>
 <p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
+go(100);
+rotate(45);
+go(100);
+rotate(45);
+go(100);
+shoot(3);
 </textarea></p>
 <table width="80%" border="0"><tr><td>
 <p align="center" style="font-size: 20px; color: black;" id="isGoal"/></td><td>
