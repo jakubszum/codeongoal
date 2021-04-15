@@ -3,11 +3,8 @@
 <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
     <title>Code on goal</title>
-<style>
-body {
-    font: normal 13px Verdana, Arial, sans-serif;
-}
-</style>
+    <link rel="stylesheet" type="text/css" href="style.css" media="screen">
+
 <link rel="stylesheet" href="lib/codemirror.css">
 <style>
 .CodeMirror {
@@ -187,6 +184,9 @@ class Player {
   }
 
   go(len) {
+    if (len < 0 || len > 200) {
+      throw "go(" + len.toString() + "): 'steps' is out of range [0..200]";
+    }
     let pos = this.pos;
     let end_pos = calc_end_pos(pos, len, this.angle);
     animation.draw_line(pos, end_pos, [5, 10]);
@@ -195,11 +195,17 @@ class Player {
   }
 
   rotate(angle_degrees) {
+    if (angle_degrees < -360 || angle_degrees > 360) {
+      throw "rotate(" + angle_degrees.toString() + "): 'degrees' is out of range [-360..360]";
+    }
     this.angle += (angle_degrees * (Math.PI / 180));
     // this.draw();
   }
 
   shoot(power) {
+    if (power < 0 || power > 5) {
+      throw "shoot(" + power.toString() + "): 'power' is out of range [0..5]";
+    }
     if (this.has_ball) {
       let pos = this.pos;
       let end_pos = calc_end_pos(pos, power * 100, this.angle);
@@ -246,76 +252,77 @@ function run() {
       editor = CodeMirror.fromTextArea(textArea, { lineNumbers: true, mode: "javascript" });
       editor.setSize("100%", "400px");
     }
-    eval(editor.getDoc().getValue());
+    var errors = document.getElementById("errors");
+    errors.textContent = '\u00a0';
+    try {
+      eval(editor.getDoc().getValue());
+    } catch(e) {
+      errors.textContent = "ERROR: " + e;
+    }
     player.draw();
     is_goal = goal.is_ball_in(ball.pos);
     if (is_goal) {
       animation.draw_message("GOAL!!!", new Point(300, 300), "yellow", "48pt sans-serif");
     }
-    var isGoal = document.getElementById("isGoal");
-    isGoal.textContent = (is_goal ? "Goal!" : "No goal");
     var button_done = document.getElementById("buttonDone");
-    button_done.disabled = !is_goal;
+    // button_done.disabled = !is_goal;
+    button_done.style.visibility = (is_goal ? 'visible' : 'hidden');
   });
 };
 
-
 function go(len) {
-  if (len > 200) {
-    len = 200;
-  }
-  if (len < 0) {
-    len = 0;
-  }
   player.go(len);
 }
 
 function rotate(angle_degrees) {
-  if (angle_degrees > 360) {
-    angle_degrees = 360;
-  }
-  if (angle_degrees < -360) {
-    angle_degrees = -360;
-  }
   player.rotate(angle_degrees);
 }
 
 function shoot(power) {
-  if (power > 5) {
-    power = 5;
-  }
-  if (power < 0) {
-    power = 0;
-  }
   player.shoot(power);
 }
 </script>
 </head>
 <body onload="run();">
 <div align="center"><h1>Code on goal</h1></div>
+<div align="center"><p id="counter">Time: -:--</p></div>
+<SCRIPT LANGUAGE="JAVASCRIPT">
+function zeroPad(num, places) {
+  var zero = places - num.toString().length + 1;
+  return Array(+(zero > 0 && zero)).join("0") + num;
+}
+var counter = 0;
+var x = setInterval(function() {
+  ++counter;
+  document.getElementById("counter").innerHTML = "Time: " + Math.floor(counter / 60) + ":" + zeroPad(counter % 60, 2);
+}, 1000);
+</SCRIPT>
 <div align="center"><table width="1200" border="0"><tr><td width="800">
 <div align="center"><canvas id="myCanvas" width="799" height="571"/></div>
 </td><td>
 <div align="center">
 <p>Code:</p>
 <form>
-<p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
-go(100);
+<!-- go(100);
 rotate(45);
 go(100);
 rotate(45);
 go(150);
 rotate(-90);
-shoot(5);
+shoot(5); -->
+<p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
 </textarea></p>
-<table width="80%" border="0"><tr><td>
-<p align="center" style="font-size: 20px; color: black;" id="isGoal"/></td><td>
-<p align="center"><input style="font-size: 22px; color: green;" type="button" value="Run" onClick="run()"></p>
-</td></tr></table>
+<p align="center" style="font-size: 12px; color: red; line-height: 16px;" id="errors"/>
+<p align="center"><input style="font-size: 26px; color: green;" type="button" value=" START " onClick="run()"></p>
 </form>
 </div>
-</br>
-<form action="logo_done.php" method="post" >
+<form action="done.php" method="post" >
+<?php
+$now = time();
+echo '<input type="hidden" name="timestamp" value="' . $now . '"/>' . "\n";
+$level = 1;
+echo '<input type="hidden" name="level" value="' . $level . '"/>' . "\n";
+?>
 <p align="center"><input style="font-size: 16px; color: green;" type="submit" name="submit" value="Done!" id="buttonDone"></p>
 </form>
 </td></tr></table></div>
