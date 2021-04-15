@@ -5,6 +5,9 @@
     <title>Code on goal</title>
     <link rel="stylesheet" type="text/css" href="style.css" media="screen">
 
+<!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/> -->
+<link rel="stylesheet" href="animate.min.css"/>
+
 <link rel="stylesheet" href="lib/codemirror.css">
 <style>
 .CodeMirror {
@@ -79,7 +82,12 @@ function draw_ball(ctx, pos) {
   ctx.stroke();
 }
 
-function draw_message(ctx, message, pos, color, font) {
+function draw_message(ctx, message, pos, color, font, shadow = true) {
+  if (shadow) {
+    ctx.fillStyle = 'black';
+    ctx.font = font;
+    ctx.fillText(message, pos.x + 4, pos.y + 4);
+  }
   ctx.fillStyle = color;
   ctx.font = font;
   ctx.fillText(message, pos.x, pos.y);
@@ -98,6 +106,25 @@ class Animation {
           func(this.ctx);
           resolve();
         }, delay);
+      });
+    });
+  }
+  
+  animate_text(message, pos, color, font, animation, prefix = 'animate__') {
+    this.promise = this.promise.then(() => {
+      new Promise((resolve, reject) => {
+        const animationName = `${prefix}${animation}`;
+        var canvas = document.getElementById("layer2");
+        var ctx = canvas.getContext("2d");
+        draw_message(ctx, message, pos, color, font);
+        const node = ctx.canvas;
+        node.classList.add(`${prefix}animated`, animationName);
+        function handleAnimationEnd(event) {
+          event.stopPropagation();
+          node.classList.remove(`${prefix}animated`, animationName);
+          resolve();
+        }
+        node.addEventListener('animationend', handleAnimationEnd, {once: true});
       });
     });
   }
@@ -227,7 +254,7 @@ var goal = null;
 var editor = null;
 
 function run() {
-  var canvas = document.getElementById("myCanvas");
+  var canvas = document.getElementById("layer1");
   var ctx = canvas.getContext("2d");
   animation = new Animation(ctx);
   ball = new Ball(ctx, new Point(0, 0));
@@ -262,7 +289,8 @@ function run() {
     player.draw();
     is_goal = goal.is_ball_in(ball.pos);
     if (is_goal) {
-      animation.draw_message("GOAL!!!", new Point(300, 300), "yellow", "48pt sans-serif");
+      // animation.draw_message("GOAL!!!", new Point(300, 300), "yellow", "48pt sans-serif");
+      animation.animate_text("GOAL!!!", new Point(300, 300), "yellow", "48pt sans-serif", "tada");
     }
     var button_done = document.getElementById("buttonDone");
     // button_done.disabled = !is_goal;
@@ -298,18 +326,23 @@ var x = setInterval(function() {
 }, 1000);
 </SCRIPT>
 <div align="center"><table width="1200" border="0"><tr><td width="800">
-<div align="center"><canvas id="myCanvas" width="799" height="571"/></div>
+<div style="position: relative;">
+<canvas id="layer1" width="799" height="571" style="/*position: absolute;*/ left: 0; top: 0; z-index: 0;"></canvas>
+<canvas id="layer2" width="799" height="571" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
+</div>
 </td><td>
 <div align="center">
 <p>Code:</p>
 <form>
-<!-- go(100);
+<!--
+go(100);
 rotate(45);
 go(100);
 rotate(45);
 go(150);
 rotate(-90);
-shoot(5); -->
+shoot(5);
+-->
 <p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
 </textarea></p>
 <p align="center" style="font-size: 12px; color: red; line-height: 16px;" id="errors"/>
