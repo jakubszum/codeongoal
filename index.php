@@ -2,8 +2,9 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
-    <title>Code on goal [TEST]</title>
+    <title>Code on goal</title>
     <link rel="stylesheet" type="text/css" href="style.css" media="screen">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
 
 <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/> -->
 <link rel="stylesheet" href="animate.min.css"/>
@@ -44,13 +45,23 @@ function draw_line(ctx, begin_pos, end_pos, dash) {
   ctx.setLineDash([]);
 }
 
-function draw_ball(ctx, pos) {
-  ctx.beginPath();
+var ball_frame_number = 0;
+
+function draw_ball(ctx, pos, angle) {
   var r = 5;
-  ctx.arc(pos.x, pos.y, r, 0, 2 * Math.PI);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.stroke();
+  var imageObj = new Image();
+  imageObj.src = "ball_frames/frame (" + ball_frame_number + ").gif";
+  imageObj.onload = () => {
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(degreeToRad(angle));
+    ctx.drawImage(imageObj, -r, -r);
+    ctx.restore();
+  };
+  ++ball_frame_number;
+  if (ball_frame_number > 21) {
+    ball_frame_number = 0;
+  }
 }
 
 function erase_ball(ctx, pos) {
@@ -74,12 +85,19 @@ function draw_player(ctx, pos, angle, color, has_ball, alpha = 1.0) {
   ctx.fillStyle = "#000000";
   ctx.fill();
   if (has_ball) {
-    // ball
-    ctx.beginPath();
-    ctx.arc(0 + 3*r/2, 0 - r, r/2, 0, 2 * Math.PI);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.stroke();
+    var imageObj = new Image();
+    imageObj.src = "ball_frames/frame (" + ball_frame_number + ").gif";
+    imageObj.onload = () => {
+      ctx.save();
+      ctx.translate(pos.x, pos.y);
+      ctx.rotate(degreeToRad(angle));
+      ctx.drawImage(imageObj, 0 + 1 * r, 0);
+      ctx.restore();
+    };
+    ++ball_frame_number;
+    if (ball_frame_number > 21) {
+      ball_frame_number = 0;
+    }
   }
   // body
   ctx.beginPath();
@@ -146,6 +164,7 @@ function rotate_player(ctx, pos, begin_angle, end_angle, color, has_ball) {
         } else if (angle < end_angle) {
           ++angle;
         }
+        --ball_frame_number;
         draw_player(ctx, pos, angle, color, has_ball);
       }
     }, 3);
@@ -158,7 +177,7 @@ function shoot_player(ctx, begin_pos, end_pos, angle, color) {
     draw_player(ctx, begin_pos, angle, color, false);
     let pos = calc_end_pos(begin_pos, 20, angle);
     if (begin_pos.x == end_pos.x && begin_pos.y == end_pos.y) {
-      draw_ball(ctx, pos);
+      draw_ball(ctx, pos, angle);
       resolve();
       return;
     }
@@ -177,7 +196,7 @@ function shoot_player(ctx, begin_pos, end_pos, angle, color) {
         pos.y += step_y;
         moved = true;
       }
-      draw_ball(ctx, pos);
+      draw_ball(ctx, pos, angle);
       if (!moved) {
         clearInterval(id);
         resolve();
@@ -474,15 +493,6 @@ rotate(-90);
 shoot(5);
 -->
 <p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
-go(100);
-rotate(60);
-go(200);
-rotate(60);
-go(150);
-rotate(60);
-go(150);
-rotate(180);
-shoot(1);
 </textarea></p>
 <p align="center" style="font-size: 12px; color: red; line-height: 16px;" id="errors"/>
 <p align="center"><input style="font-size: 26px; color: green;" type="button" value=" START " onClick="run()"></p>
