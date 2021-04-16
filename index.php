@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
-    <title>Code on goal</title>
+    <title>Code on goal [TEST]</title>
     <link rel="stylesheet" type="text/css" href="style.css" media="screen">
 
 <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/> -->
@@ -25,9 +25,13 @@ class Point {
   }
 };
 
+function degreeToRad(angle) {
+  return angle * (Math.PI / 180);
+}
+
 function calc_end_pos(begin_pos, len, angle) {
-  var end_x = begin_pos.x + len * Math.cos(angle);
-  var end_y = begin_pos.y + len * Math.sin(angle);
+  var end_x = Math.floor(begin_pos.x + len * Math.cos(degreeToRad(angle)));
+  var end_y = Math.floor(begin_pos.y + len * Math.sin(degreeToRad(angle)));
   return new Point(end_x, end_y);
 }
 
@@ -40,11 +44,29 @@ function draw_line(ctx, begin_pos, end_pos, dash) {
   ctx.setLineDash([]);
 }
 
-function draw_player(ctx, pos, angle, color, has_ball) {
+function draw_ball(ctx, pos) {
+  ctx.beginPath();
+  var r = 5;
+  ctx.arc(pos.x, pos.y, r, 0, 2 * Math.PI);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.stroke();
+}
+
+function erase_ball(ctx, pos) {
+  var r = 5;
+  ctx.clearRect(pos.x - (r * 1.2), pos.y - (r * 1.2), (r * 2.5), (r * 2.5));
+}
+
+var player_size_r = 10;
+
+function draw_player(ctx, pos, angle, color, has_ball, alpha = 1.0) {
   ctx.save();
-  var r = 10;
+  let r = player_size_r;
+  let ball_pos = null;
   ctx.translate(pos.x, pos.y);
-  ctx.rotate(angle);
+  ctx.rotate(degreeToRad(angle));
+  ctx.globalAlpha = alpha;
   //feets
   ctx.beginPath();
   ctx.arc(0 + 3*r/4, 0 - 2*r/3, r/2, 0, 2 * Math.PI);
@@ -70,16 +92,98 @@ function draw_player(ctx, pos, angle, color, has_ball) {
   ctx.arc(0, 0, r/2, 0, 2 * Math.PI);
   ctx.fillStyle = "#000000";
   ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
-function draw_ball(ctx, pos) {
-  ctx.beginPath();
-  var r = 5;
-  ctx.arc(pos.x, pos.y, r, 0, 2 * Math.PI);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.stroke();
+function erase_player(ctx, pos, angle, color, has_ball) {
+  ctx.save();
+  ctx.translate(pos.x, pos.y);
+  ctx.rotate(degreeToRad(angle));
+  let r = player_size_r;
+  ctx.clearRect(0 - (r * 1.2), 0 - (r * 1.8), (r * 3.5), (r * 3.6));
+  ctx.restore();
+}
+
+function move_player(ctx, begin_pos, end_pos, angle, color, has_ball) {
+  return new Promise((resolve, reject) => {
+    let pos = begin_pos;
+    let max_steps = (Math.abs(end_pos.x - pos.x) > Math.abs(end_pos.y - pos.y))
+        ? Math.abs(end_pos.x - pos.x) : Math.abs(end_pos.y - pos.y);
+    let step_x = (end_pos.x - pos.x) / max_steps;
+    let step_y = (end_pos.y - pos.y) / max_steps;
+    let id = setInterval(() => {
+      moved = false;
+      erase_player(ctx, pos, angle, color, has_ball);
+      if (Math.floor(pos.x) != end_pos.x) {
+        pos.x += step_x;
+        moved = true;
+      }
+      if (Math.floor(pos.y) != end_pos.y) {
+        pos.y += step_y;
+        moved = true;
+      }
+      draw_player(ctx, pos, angle, color, has_ball);
+      if (!moved) {
+        clearInterval(id);
+        resolve();
+      }
+    }, 3);
+  });
+}
+
+function rotate_player(ctx, pos, begin_angle, end_angle, color, has_ball) {
+  return new Promise((resolve, reject) => {
+    let angle = begin_angle;
+    let id = setInterval(() => {
+      if (angle == end_angle) {
+        clearInterval(id);
+        resolve();
+      } else {
+        erase_player(ctx, pos, angle, color, has_ball);
+        if (angle > end_angle) {
+          --angle;
+        } else if (angle < end_angle) {
+          ++angle;
+        }
+        draw_player(ctx, pos, angle, color, has_ball);
+      }
+    }, 3);
+  });
+}
+
+function shoot_player(ctx, begin_pos, end_pos, angle, color) {
+  return new Promise((resolve, reject) => {
+    erase_player(ctx, begin_pos, angle, color, true);
+    draw_player(ctx, begin_pos, angle, color, false);
+    let pos = calc_end_pos(begin_pos, 20, angle);
+    if (begin_pos.x == end_pos.x && begin_pos.y == end_pos.y) {
+      draw_ball(ctx, pos);
+      resolve();
+      return;
+    }
+    let max_steps = (Math.abs(end_pos.x - pos.x) > Math.abs(end_pos.y - pos.y))
+        ? Math.abs(end_pos.x - pos.x) : Math.abs(end_pos.y - pos.y);
+    let step_x = (end_pos.x - pos.x) / max_steps;
+    let step_y = (end_pos.y - pos.y) / max_steps;
+    let id = setInterval(() => {
+      moved = false;
+      erase_ball(ctx, pos);
+      if (Math.floor(pos.x) != end_pos.x) {
+        pos.x += step_x;
+        moved = true;
+      }
+      if (Math.floor(pos.y) != end_pos.y) {
+        pos.y += step_y;
+        moved = true;
+      }
+      draw_ball(ctx, pos);
+      if (!moved) {
+        clearInterval(id);
+        resolve();
+      }
+    }, 1);
+  });
 }
 
 function draw_message(ctx, message, pos, color, font, shadow = true) {
@@ -94,8 +198,12 @@ function draw_message(ctx, message, pos, color, font, shadow = true) {
 }
 
 class Animation {
-  constructor(ctx) {
-    this.ctx = ctx;
+  constructor(backgroundCtx, playerCtx, messageCtx) {
+    this.backgroundCtx = backgroundCtx;
+    this.playerCtx = playerCtx;
+    playerCtx.clearRect(0, 0, playerCtx.canvas.width, playerCtx.canvas.height);
+    this.messageCtx = messageCtx;
+    messageCtx.clearRect(0, 0, messageCtx.canvas.width, messageCtx.canvas.height);
     this.promise = new Promise((resolve, reject) => { resolve(); });
   }
 
@@ -103,7 +211,7 @@ class Animation {
     this.promise = this.promise.then(() => {
       return new Promise((resolve, reject) => {
         setTimeout(() => {
-          func(this.ctx);
+          func(this.playerCtx);
           resolve();
         }, delay);
       });
@@ -114,10 +222,8 @@ class Animation {
     this.promise = this.promise.then(() => {
       new Promise((resolve, reject) => {
         const animationName = `${prefix}${animation}`;
-        var canvas = document.getElementById("layer2");
-        var ctx = canvas.getContext("2d");
-        draw_message(ctx, message, pos, color, font);
-        const node = ctx.canvas;
+        draw_message(this.messageCtx, message, pos, color, font);
+        const node = this.messageCtx.canvas;
         node.classList.add(`${prefix}animated`, animationName);
         function handleAnimationEnd(event) {
           event.stopPropagation();
@@ -126,6 +232,24 @@ class Animation {
         }
         node.addEventListener('animationend', handleAnimationEnd, {once: true});
       });
+    });
+  }
+
+  move_player(begin_pos, end_pos, angle, color, has_ball) {
+    this.promise = this.promise.then(() => {
+      return move_player(this.playerCtx, begin_pos, end_pos, angle, color, has_ball);
+    });
+  }
+  
+  rotate_player(pos, begin_angle, end_angle, color, has_ball) {
+    this.promise = this.promise.then(() => {
+      return rotate_player(this.playerCtx, pos, begin_angle, end_angle, color, has_ball);
+    });
+  }
+
+  shoot_player(begin_pos, end_pos, angle, color) {
+    this.promise = this.promise.then(() => {
+      return shoot_player(this.playerCtx, begin_pos, end_pos, angle, color);
     });
   }
 
@@ -149,8 +273,7 @@ class Animation {
 var animation = null;
 
 class Ball {
-  constructor(ctx, pos) {
-    this.ctx = ctx;
+  constructor(pos) {
     this.pos = pos;
   }
 
@@ -190,8 +313,7 @@ class Goal {
 };
 
 class Player {
-  constructor(ctx, pos, angle, color, ball, has_ball) {
-    this.ctx = ctx;
+  constructor(pos, angle, color, ball, has_ball) {
     this.pos = pos;
     this.angle = angle;
     this.color = color;
@@ -215,18 +337,25 @@ class Player {
       throw "go(" + len.toString() + "): 'steps' is out of range [0..200]";
     }
     let pos = this.pos;
+    let angle = this.angle;
+    let has_ball = this.has_ball;
+    let color = this.color;
     let end_pos = calc_end_pos(pos, len, this.angle);
-    animation.draw_line(pos, end_pos, [5, 10]);
+    animation.move_player(pos, end_pos, angle, color, has_ball);
     this.pos = end_pos;
-    // this.draw();
   }
 
-  rotate(angle_degrees) {
-    if (angle_degrees < -360 || angle_degrees > 360) {
-      throw "rotate(" + angle_degrees.toString() + "): 'degrees' is out of range [-360..360]";
+  rotate(angle) {
+    if (angle < -360 || angle > 360) {
+      throw "rotate(" + angle.toString() + "): 'degrees' is out of range [-360..360]";
     }
-    this.angle += (angle_degrees * (Math.PI / 180));
-    // this.draw();
+    let begin_angle = this.angle;
+    let end_angle = Math.floor(begin_angle + angle);
+    let pos = this.pos;
+    let has_ball = this.has_ball;
+    let color = this.color;
+    animation.rotate_player(pos, begin_angle, end_angle, color, has_ball);
+    this.angle = end_angle;
   }
 
   shoot(power) {
@@ -236,16 +365,16 @@ class Player {
     if (this.has_ball) {
       let pos = this.pos;
       let end_pos = calc_end_pos(pos, power * 100, this.angle);
-      animation.draw_line(pos, end_pos, [3, 3]);
+      let angle = this.angle;
+      let has_ball = this.has_ball;
+      let color = this.color;
+      animation.shoot_player(pos, end_pos, angle, color);
       ball.pos = end_pos;
       ball.draw();
       this.has_ball = false;
     }
   }
 };
-
-var player_start_pos = new Point(100, 50);
-var player_start_angle = 0;
 
 var player = null;
 var ball = null;
@@ -254,26 +383,28 @@ var goal = null;
 var editor = null;
 
 function run() {
-  var canvas = document.getElementById("layer1");
-  var ctx = canvas.getContext("2d");
-  animation = new Animation(ctx);
-  ball = new Ball(ctx, new Point(0, 0));
-  player = new Player(ctx, player_start_pos, player_start_angle, "red", ball, true);
-  goal = new Goal(ctx, new Point(750, 245), 40, 80);
+  var backgroundCtx = document.getElementById("layer1").getContext("2d");
+  var playerCtx = document.getElementById("layer2").getContext("2d");
+  var messageCtx = document.getElementById("layer3").getContext("2d");
+  animation = new Animation(backgroundCtx, playerCtx, messageCtx);
+  ball = new Ball(new Point(0, 0));
+  let player_start_pos = new Point(100, 50);
+  let player_start_angle = 0;
+  player = new Player(player_start_pos, player_start_angle, "red", ball, true);
+  goal = new Goal(backgroundCtx, new Point(750, 245), 40, 80);
   var imageObj = new Image();
   imageObj.src = "boisko.jpg";
   new Promise((resolve, reject) => {
     imageObj.onload = resolve;
   }).then(() => {
-    ctx.drawImage(imageObj, 0, 0);
-    ctx.lineWidth = 1;
-    ctx.fillStyle = "#FFFFFF";
-    ctx.lineStyle = "#ffff00";
-    ctx.font = "10pt sans-serif";
-    ctx.fillText("goal.ziv.pl", 6, 16);
+    backgroundCtx.drawImage(imageObj, 0, 0);
+    backgroundCtx.lineWidth = 1;
+    backgroundCtx.fillStyle = "#FFFFFF";
+    backgroundCtx.lineStyle = "#ffff00";
+    backgroundCtx.font = "10pt sans-serif";
+    backgroundCtx.fillText("goal.ziv.pl", 6, 16);
     goal.draw();
-    let player2 = new Player(ctx, player_start_pos, player_start_angle, "silver", ball, false);
-    player2.draw();
+    draw_player(backgroundCtx, player_start_pos, player_start_angle, "red", true, 0.3)
     var textArea = document.getElementById("myText");
     if (!editor) {
       editor = CodeMirror.fromTextArea(textArea, { lineNumbers: true, mode: "javascript" });
@@ -289,11 +420,9 @@ function run() {
     player.draw();
     is_goal = goal.is_ball_in(ball.pos);
     if (is_goal) {
-      // animation.draw_message("GOAL!!!", new Point(300, 300), "yellow", "48pt sans-serif");
       animation.animate_text("GOAL!!!", new Point(300, 300), "yellow", "48pt sans-serif", "tada");
     }
     var button_done = document.getElementById("buttonDone");
-    // button_done.disabled = !is_goal;
     button_done.style.visibility = (is_goal ? 'visible' : 'hidden');
   });
 };
@@ -329,6 +458,7 @@ var x = setInterval(function() {
 <div style="position: relative;">
 <canvas id="layer1" width="799" height="571" style="/*position: absolute;*/ left: 0; top: 0; z-index: 0;"></canvas>
 <canvas id="layer2" width="799" height="571" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
+<canvas id="layer3" width="799" height="571" style="position: absolute; left: 0; top: 0; z-index: 2;"></canvas>
 </div>
 </td><td>
 <div align="center">
@@ -344,6 +474,15 @@ rotate(-90);
 shoot(5);
 -->
 <p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
+go(100);
+rotate(60);
+go(200);
+rotate(60);
+go(150);
+rotate(60);
+go(150);
+rotate(180);
+shoot(1);
 </textarea></p>
 <p align="center" style="font-size: 12px; color: red; line-height: 16px;" id="errors"/>
 <p align="center"><input style="font-size: 26px; color: green;" type="button" value=" START " onClick="run()"></p>
