@@ -72,46 +72,49 @@ function erase_ball(ctx, pos) {
 var player_size_r = 10;
 
 function draw_player(ctx, pos, angle, color, has_ball, alpha = 1.0) {
-  ctx.save();
-  let r = player_size_r;
-  let ball_pos = null;
-  ctx.translate(pos.x, pos.y);
-  ctx.rotate(degreeToRad(angle));
-  ctx.globalAlpha = alpha;
-  //feets
-  ctx.beginPath();
-  ctx.arc(0 + 3*r/4, 0 - 2*r/3, r/2, 0, 2 * Math.PI);
-  ctx.arc(0 + 3*r/4, 0 + 2*r/3, r/2, 0, 2 * Math.PI);
-  ctx.fillStyle = "#000000";
-  ctx.fill();
-  if (has_ball) {
-    var imageObj = new Image();
-    imageObj.src = "ball_frames/frame (" + ball_frame_number + ").gif";
-    imageObj.onload = () => {
-      ctx.save();
-      ctx.translate(pos.x, pos.y);
-      ctx.rotate(degreeToRad(angle));
-      ctx.drawImage(imageObj, 0 + 1 * r, 0);
-      ctx.restore();
-    };
-    ++ball_frame_number;
-    if (ball_frame_number > 21) {
-      ball_frame_number = 0;
+  return new Promise((resolve, reject) => {
+    ctx.save();
+    let r = player_size_r;
+    let ball_pos = null;
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(degreeToRad(angle));
+    ctx.globalAlpha = alpha;
+    //feets
+    ctx.beginPath();
+    ctx.arc(0 + 3*r/4, 0 - 2*r/3, r/2, 0, 2 * Math.PI);
+    ctx.arc(0 + 3*r/4, 0 + 2*r/3, r/2, 0, 2 * Math.PI);
+    ctx.fillStyle = "#000000";
+    ctx.fill();
+    if (has_ball) {
+      var imageObj = new Image();
+      imageObj.src = "ball_frames/frame (" + ball_frame_number + ").gif";
+      imageObj.onload = () => {
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(degreeToRad(angle));
+        ctx.drawImage(imageObj, 0 + 1 * r, 0);
+        ctx.restore();
+        resolve();
+      };
+      ++ball_frame_number;
+      if (ball_frame_number > 21) {
+        ball_frame_number = 0;
+      }
     }
-  }
-  // body
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r, r + r/2, 0, 0, 2 * Math.PI)
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.stroke();
-  // head
-  ctx.beginPath();
-  ctx.arc(0, 0, r/2, 0, 2 * Math.PI);
-  ctx.fillStyle = "#000000";
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+    // body
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r + r/2, 0, 0, 2 * Math.PI)
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.stroke();
+    // head
+    ctx.beginPath();
+    ctx.arc(0, 0, r/2, 0, 2 * Math.PI);
+    ctx.fillStyle = "#000000";
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
 }
 
 function erase_player(ctx, pos, angle, color, has_ball) {
@@ -141,11 +144,12 @@ function move_player(ctx, begin_pos, end_pos, angle, color, has_ball) {
         pos.y += step_y;
         moved = true;
       }
-      draw_player(ctx, pos, angle, color, has_ball);
-      if (!moved) {
-        clearInterval(id);
-        resolve();
-      }
+      draw_player(ctx, pos, angle, color, has_ball).then(() => {
+        if (!moved) {
+          clearInterval(id);
+          resolve();
+        }
+      });
     }, 3);
   });
 }
@@ -493,6 +497,8 @@ rotate(-90);
 shoot(5);
 -->
 <p align="left"><textarea name="Text1" cols="46" rows="30" id="myText">
+go(100);
+shoot(3);
 </textarea></p>
 <p align="center" style="font-size: 12px; color: red; line-height: 16px;" id="errors"/>
 <p align="center"><input style="font-size: 26px; color: green;" type="button" value=" START " onClick="run()"></p>
